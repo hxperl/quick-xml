@@ -25,6 +25,9 @@
 
 - [#1007]: Remove error-prone implementations of `Hash`, `PartialOrd`, and `Ord` from all
   events except `BytesText` and `BytesCData`, which was introduced in [#1005].
+- [#1018]: Fix deserialization of the content after an element whose `Visitor` did not
+  read all of it, which is the case for `impl_deserialize_for_internally_tagged_enum!`
+  when a variant is mapped onto an inner enum.
 
 ### Misc Changes
 
@@ -35,6 +38,7 @@
 [#1009]: https://github.com/tafia/quick-xml/pull/1009
 [#1010]: https://github.com/tafia/quick-xml/pull/1010
 [#1015]: https://github.com/tafia/quick-xml/pull/1015
+[#1018]: https://github.com/tafia/quick-xml/pull/1018
 
 
 ## 0.42.0 -- 2026-08-22
