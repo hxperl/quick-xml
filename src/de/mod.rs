@@ -2110,7 +2110,7 @@ use crate::XmlVersion;
 pub use crate::errors::serialize::DeError;
 
 use crate::{
-    de::map::ElementMapAccess,
+    de::map::deserialize_element,
     errors::Error,
     escape::{EscapeError, parse_number},
     events::{BytesCData, BytesEnd, BytesRef, BytesStart, BytesText, Event},
@@ -3388,7 +3388,7 @@ where
         // When document is pretty-printed there could be whitespaces before the root element
         self.skip_whitespaces()?;
         match self.next()? {
-            DeEvent::Start(e) => visitor.visit_map(ElementMapAccess::new(self, e, fields)?),
+            DeEvent::Start(e) => deserialize_element(self, e, fields, visitor),
             // SAFETY: The reader is guaranteed that we don't have unmatched tags
             // If we here, then our deserializer has a bug
             DeEvent::End(e) => unreachable!("{:?}", e),

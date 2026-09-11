@@ -931,6 +931,117 @@ fn issue928() {
     );
 }
 
+/// Regression test for https://github.com/tafia/quick-xml/issues/928.
+///
+/// The `Create` variant below is deliberately mapped to the inner `Element`
+/// enum instead of to `ElementHolder`, which is the mapping from the issue.
+/// That makes `serde`'s `MapAccessDeserializer` take its `deserialize_enum`
+/// path, which reads only one entry from the map and does not read it to the
+/// end, so the `</action>` event was left unconsumed and desynchronized the
+/// deserializer of the enclosing `<root>` element.
+#[cfg(feature = "serde-types")]
+mod issue928_partially_read_element {
+    use super::*;
+    use pretty_assertions::assert_eq;
+    use quick_xml::impl_deserialize_for_internally_tagged_enum;
+
+    #[derive(Debug, Deserialize, PartialEq)]
+    #[serde(rename_all = "kebab-case")]
+    enum Element {
+        Node {
+            #[serde(rename = "@id")]
+            id: u64,
+        },
+        Way,
+    }
+
+    #[derive(Debug, Deserialize, PartialEq)]
+    struct ElementHolder {
+        #[serde(rename = "$value")]
+        e: Element,
+    }
+
+    #[derive(Debug, PartialEq)]
+    enum Action {
+        Create(Element),
+        Modify { old: ElementHolder },
+    }
+
+    impl_deserialize_for_internally_tagged_enum! {
+        Action, "@type",
+        ("create" => Create(Element)),
+        ("modify" => Modify { old: ElementHolder })
+    }
+
+    #[test]
+    fn only_element() {
+        #[derive(Debug, Deserialize, PartialEq)]
+        struct Root {
+            action: Action,
+        }
+
+        assert_eq!(
+            from_str::<Root>(r#"<root><action type="create"><node id="1"/></action></root>"#)
+                .unwrap(),
+            Root {
+                action: Action::Create(Element::Node { id: 1 }),
+            },
+        );
+    }
+
+    /// The element is followed by a sibling, so the unconsumed `</action>` was
+    /// observed by the `<root>` accessor.
+    #[test]
+    fn element_then_sibling() {
+        #[derive(Debug, Deserialize, PartialEq)]
+        struct Root {
+            action: Action,
+            after: String,
+        }
+
+        assert_eq!(
+            from_str::<Root>(
+                r#"<root><action type="create"><node id="1"/></action><after>text</after></root>"#
+            )
+            .unwrap(),
+            Root {
+                action: Action::Create(Element::Node { id: 1 }),
+                after: "text".to_string(),
+            },
+        );
+    }
+
+    /// Mixes the variant that reads the element to the end (`Modify`) with the
+    /// variant that does not (`Create`) inside one sequence.
+    #[test]
+    fn sequence() {
+        #[derive(Debug, Deserialize, PartialEq)]
+        struct Root {
+            action: Vec<Action>,
+        }
+
+        assert_eq!(
+            from_str::<Root>(
+                r#"<root>
+                     <action type="create"><node id="1"/></action>
+                     <action type="modify"><old><way/></old></action>
+                     <action type="create"><way/></action>
+                   </root>"#
+            )
+            .unwrap(),
+            Root {
+                action: vec![
+                    Action::Create(Element::Node { id: 1 }),
+                    Action::Modify {
+                        old: ElementHolder { e: Element::Way },
+                    },
+                    Action::Create(Element::Way),
+                ],
+            },
+        );
+    }
+}
+
 /// Regression test for https://github.com/tafia/quick-xml/issues/953.
 mod issue953 {
     use super::*;

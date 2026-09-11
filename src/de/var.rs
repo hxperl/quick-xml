@@ -1,6 +1,6 @@
 use crate::{
     de::key::QNameDeserializer,
-    de::map::ElementMapAccess,
+    de::map::deserialize_element,
     de::resolver::EntityResolver,
     de::simple_type::SimpleTypeDeserializer,
     de::{DeEvent, Deserializer, TEXT_KEY, XmlRead},
@@ -132,7 +132,7 @@ where
         V: Visitor<'de>,
     {
         match self.de.next()? {
-            DeEvent::Start(e) => visitor.visit_map(ElementMapAccess::new(self.de, e, fields)?),
+            DeEvent::Start(e) => deserialize_element(self.de, e, fields, visitor),
             DeEvent::Text(e) => {
                 SimpleTypeDeserializer::from_text_content(e).deserialize_struct("", fields, visitor)
             }
